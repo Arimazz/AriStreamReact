@@ -33,6 +33,7 @@ class App extends Component {
     this.lastPerfStamp = 0;
     this.timeOut = null;
     this.updateServerTimer = null;
+    this.channel = null;
   }
 
   clientUpdate = () => {
@@ -67,6 +68,15 @@ class App extends Component {
     console.log('getPeerConnection')
     this.peerConnection = new RTCPeerConnection(RTCConfig);
     this.peerConnection.onaddstream = this.gotRemoteStream;
+    this.peerConnection.ondatachannel = (ev) => {
+      this.channel = ev.channel;
+      this.channel.onopen = (ev) => {
+        console.log('OPEN');
+        this.channel.onmessage = (ev) => {
+          console.log('MESSAGE', ev.data);
+        }
+      }
+    }
     this.peerConnection.onicecandidate = this.gotIceCandidate;
     this.peerConnection.oniceconnectionstatechange = this.onConnectionStatusChange;
     this.peerConnection.onsignalingstatechange = (event) => { 
@@ -104,7 +114,6 @@ class App extends Component {
       alert("Please enter the offer");
       return;
     }
-
     this.createAnswer(data);
   }
 
@@ -113,6 +122,7 @@ class App extends Component {
     this.localVideo.current.srcObject = stream;
     this.localVideo.current.muted = true;
     this.peerConnection.addStream(stream);
+    this.peerConnection.createDataChannel('chat');
     this.peerConnection.createOffer(this.onConnection, this.handleError);
   }
 
@@ -203,7 +213,7 @@ class App extends Component {
           }
           this.setState({input: JSON.stringify(this.signalData)})
         }
-      }, 700);
+      }, 5000);
     }
   }
 
@@ -304,6 +314,9 @@ class App extends Component {
               <button onClick={this.handleCall} disabled={isHostReady}>
                 {!isHostReady ? 'call' : "HOST READY"}
               </button>
+              <button onClick={this.channel?.send(`message from HOST`)}>
+                send check
+              </button>
               <div>
                 <video
                   controls
@@ -319,6 +332,9 @@ class App extends Component {
             <div>
               <button onClick={this.handleJoin}>
                 join
+              </button>
+              <button onClick={this.channel?.send(`message from CLIENT`)}>
+                send check
               </button>
               <div>
                 <video
