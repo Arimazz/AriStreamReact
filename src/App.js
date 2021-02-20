@@ -88,18 +88,17 @@ class App extends Component {
   }
 
   joinSession = (data) => {
-    // const {input} = this.state;
     console.log('joinSession');
     if (this.peerConnection == null) {
       this.getPeerConnection();
     }
-    // console.log(txtBox.val().trim())
+
     const sigdata = JSON.parse(data);
     if (sigdata["desc"] === "") {
       alert("Please enter the offer");
       return;
     }
-    // cpyRow.show();
+
     this.createAnswer(data);
   }
 
@@ -108,8 +107,6 @@ class App extends Component {
     this.localVideo.current.srcObject = stream;
     this.peerConnection.addStream(stream);
     this.peerConnection.createOffer(this.onConnection, this.handleError);
-    // txtBox.popover('show');
-    // cpyRow.show();
   }
 
   initiateOffer = () => {
@@ -131,19 +128,14 @@ class App extends Component {
   }
 
   createAnswer = (data) => {
-    const {input} = this.state;
     console.log('create answer');
     const sigdata = JSON.parse(data);
-    // this.localVideo.current.srcObject = stream;
-    // this.peerConnection.addStream(stream);
     this.peerConnection.setRemoteDescription(new RTCSessionDescription(sigdata["desc"]), function () { console.log("Success"); }, this.handleError);
     this.peerConnection.createAnswer(this.sendReply, this.handleError);
     this.addIceCandidates(sigdata["ice"]);
-    // txtBox.popover("show");
   }
 
   completeHandshake = (data) => {
-    // const {input} = this.state;
     console.log("Inside complete handshake");
     let sigdata = data.trim();
     sigdata = JSON.parse(sigdata);
@@ -153,7 +145,6 @@ class App extends Component {
     }
     this.peerConnection.setRemoteDescription(new RTCSessionDescription(sigdata["desc"]), function () { console.log("Success"); }, this.handleError);
     this.addIceCandidates(sigdata["ice"]);
-
   }
 
   sendReply = (desc) => {
@@ -164,9 +155,6 @@ class App extends Component {
     writeData(roomInput, ROLES.CLIENT, {
       answer: JSON.stringify(this.signalData),
     })
-    // console.log(JSON.stringify(this.signalData));
-    // this.cpyJumbRow.show();
-    // cpyJumBtn.popover('show');
   }
 
   clearRoomThenStartSession = () => {
@@ -237,14 +225,6 @@ class App extends Component {
     // showModal();
   }
 
-  showModal = () => {
-    // $("#textModal").modal('show');
-  }
-
-  hideModal = () => {
-    // $("#textModal").modal('hide');
-  }
-
   onConnectionStatusChange = (event) => {
     switch (this.peerConnection.iceConnectionState) {
       case 'checking':
@@ -254,9 +234,6 @@ class App extends Component {
         console.log('Connection established.');
         clearInterval(this.updateServerTimer);
         this.updateServerTimer = null;
-        // $('#textModal').modal('hide');
-        // $("#localVideo").show();
-        // $("#hangupdiv").show();
         break;
       case 'disconnected':
         console.log('Disconnected.');
@@ -283,12 +260,21 @@ class App extends Component {
   }
 
   handleCall = () => {
-    this.initiateOffer();
+    const {roomInput} = this.state;
+    if (roomInput > 0) {
+      this.initiateOffer();
+    } else {
+      alert('ENTER ROOM ID')
+    }
   }
 
   handleJoin = () => {
-    this.startCheckingServerData();
-    // this.joinSession();
+    const {roomInput} = this.state;
+    if (roomInput > 0) {
+      this.startCheckingServerData();
+    } else {
+      alert('ENTER ROOM ID')
+    }
   }
 
   setRole = (role) => {
