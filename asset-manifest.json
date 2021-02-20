@@ -1,8 +1,8 @@
 {
   "files": {
     "main.css": "/AriStreamReact/static/css/main.68b27b7c.chunk.css",
-    "main.js": "/AriStreamReact/static/js/main.9a0da4dd.chunk.js",
-    "main.js.map": "/AriStreamReact/static/js/main.9a0da4dd.chunk.js.map",
+    "main.js": "/AriStreamReact/static/js/main.e5438e85.chunk.js",
+    "main.js.map": "/AriStreamReact/static/js/main.e5438e85.chunk.js.map",
     "runtime-main.js": "/AriStreamReact/static/js/runtime-main.81cc0257.js",
     "runtime-main.js.map": "/AriStreamReact/static/js/runtime-main.81cc0257.js.map",
     "static/js/2.4a99fb7d.chunk.js": "/AriStreamReact/static/js/2.4a99fb7d.chunk.js",
@@ -15,6 +15,6 @@
     "static/js/runtime-main.81cc0257.js",
     "static/js/2.4a99fb7d.chunk.js",
     "static/css/main.68b27b7c.chunk.css",
-    "static/js/main.9a0da4dd.chunk.js"
+    "static/js/main.e5438e85.chunk.js"
   ]
 }
