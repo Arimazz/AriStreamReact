@@ -22,6 +22,7 @@ class App extends Component {
       dataFromServer: {},
       isOffer: false,
       isAnswer: false,
+      isHostReady: false,
     };
     this.signalData = { "desc": null, "ice": [] };
     this.peerConnection = null;
@@ -78,7 +79,12 @@ class App extends Component {
     navigator.mediaDevices.getDisplayMedia(
       {
         audio: true,
-        video: true
+        video: {
+          width: 1920,
+          height: 1080,
+          frameRate: 30,
+
+        }
       }).then((stream) => {
         this.localStream = stream;
         callback(stream);
@@ -105,6 +111,7 @@ class App extends Component {
   createOffer = (stream) => {
     console.log('create offer');
     this.localVideo.current.srcObject = stream;
+    this.localVideo.current.muted = true;
     this.peerConnection.addStream(stream);
     this.peerConnection.createOffer(this.onConnection, this.handleError);
   }
@@ -166,6 +173,7 @@ class App extends Component {
         role,
         {offer: JSON.stringify(this.signalData)},
         () => {
+          this.setState({isHostReady: true});
           this.startCheckingServerData();
         });
     })
@@ -261,7 +269,7 @@ class App extends Component {
 
   handleCall = () => {
     const {roomInput} = this.state;
-    if (roomInput > 0) {
+    if (roomInput.length > 0) {
       this.initiateOffer();
     } else {
       alert('ENTER ROOM ID')
@@ -270,7 +278,7 @@ class App extends Component {
 
   handleJoin = () => {
     const {roomInput} = this.state;
-    if (roomInput > 0) {
+    if (roomInput.length > 0) {
       this.startCheckingServerData();
     } else {
       alert('ENTER ROOM ID')
@@ -282,7 +290,7 @@ class App extends Component {
   }
 
   renderMain = () => {
-    const {role, roomInput} = this.state;
+    const {role, roomInput, isHostReady} = this.state;
     if (role !== '') {
       return (
         <>
@@ -293,8 +301,8 @@ class App extends Component {
           />
           {role === ROLES.HOST && (
             <div>
-              <button onClick={this.handleCall}>
-                call
+              <button onClick={this.handleCall} disabled={isHostReady}>
+                {!isHostReady ? 'call' : "HOST READY"}
               </button>
               <div>
                 <video
