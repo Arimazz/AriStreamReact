@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import {writeData, readData, clearData} from './firebase/database';
 import './App.css';
 
 const RTCConfig = {
@@ -6,17 +7,59 @@ const RTCConfig = {
     url: 'stun:stun.l.google.com:19302'
   }]
 };
+
+const ROLES = {
+  HOST: 'host',
+  CLIENT: 'client',
+};
 class App extends Component {
   constructor (props) {
     super(props);
     this.state = {
       input: '',
+      role: '',
+      roomInput: '',
+      dataFromServer: {},
+      isOffer: false,
+      isAnswer: false,
     };
     this.signalData = { "desc": null, "ice": [] };
     this.peerConnection = null;
     this.localVideo = React.createRef(null);
     this.remoteVideo = React.createRef(null);
     this.localStream = null;
+    this.perfArr = [];
+    this.lastPerfStamp = 0;
+    this.timeOut = null;
+    this.updateServerTimer = null;
+  }
+
+  clientUpdate = () => {
+    const {dataFromServer, isOffer} = this.state;
+    console.log('GET OFFER', dataFromServer)
+    if (dataFromServer?.host?.offer && !isOffer) {
+      this.setState({isOffer: true});
+      this.joinSession(dataFromServer.host.offer);
+    }
+  }
+
+  hostUpdate = () => {
+    const {dataFromServer, isAnswer} = this.state;
+    if (dataFromServer?.client?.answer && !isAnswer) {
+      this.setState({isAnswer: true});
+      this.completeHandshake(dataFromServer.client.answer);
+    }
+  }
+
+  componentDidUpdate() {
+    const {role, dataFromServer} = this.state;
+    console.log('UPDATESERVER', dataFromServer)
+    if (role === ROLES.CLIENT) {
+      this.clientUpdate();
+    }
+    if (role === ROLES.HOST) {
+      this.hostUpdate();
+    }
   }
 
   getPeerConnection = () => {
@@ -44,20 +87,20 @@ class App extends Component {
       });
   }
 
-  joinSession = () => {
-    const {input} = this.state;
+  joinSession = (data) => {
+    // const {input} = this.state;
     console.log('joinSession');
     if (this.peerConnection == null) {
       this.getPeerConnection();
     }
     // console.log(txtBox.val().trim())
-    var sigdata = JSON.parse(input.trim());
+    const sigdata = JSON.parse(data);
     if (sigdata["desc"] === "") {
       alert("Please enter the offer");
       return;
     }
     // cpyRow.show();
-    this.getMediaStream(this.createAnswer);
+    this.createAnswer(data);
   }
 
   createOffer = (stream) => {
@@ -78,7 +121,7 @@ class App extends Component {
   }
 
   onConnection = (desc) => {
-    console.log("Description is " + desc.sdp);
+    console.log("Description is ", desc);
     this.peerConnection.setLocalDescription(desc);
     this.signalData["desc"] = desc;
     //Change the event on click of Join Button to Complete Handshake on Initiator Side
@@ -87,22 +130,22 @@ class App extends Component {
     }
   }
 
-  createAnswer = (stream) => {
+  createAnswer = (data) => {
     const {input} = this.state;
     console.log('create answer');
-    const sigdata = JSON.parse(input.trim());
-    this.localVideo.current.srcObject = stream;
-    this.peerConnection.addStream(stream);
+    const sigdata = JSON.parse(data);
+    // this.localVideo.current.srcObject = stream;
+    // this.peerConnection.addStream(stream);
     this.peerConnection.setRemoteDescription(new RTCSessionDescription(sigdata["desc"]), function () { console.log("Success"); }, this.handleError);
     this.peerConnection.createAnswer(this.sendReply, this.handleError);
     this.addIceCandidates(sigdata["ice"]);
     // txtBox.popover("show");
   }
 
-  completeHandshake = () => {
-    const {input} = this.state;
+  completeHandshake = (data) => {
+    // const {input} = this.state;
     console.log("Inside complete handshake");
-    let sigdata = input.trim();
+    let sigdata = data.trim();
     sigdata = JSON.parse(sigdata);
     if (!sigdata["desc"]) {
       alert("Please enter the answer");
@@ -114,21 +157,57 @@ class App extends Component {
   }
 
   sendReply = (desc) => {
+    const {roomInput} = this.state;
     console.log('send reply');
     this.peerConnection.setLocalDescription(desc);
     this.signalData["desc"] = desc;
-    console.log(JSON.stringify(this.signalData));
+    writeData(roomInput, ROLES.CLIENT, {
+      answer: JSON.stringify(this.signalData),
+    })
+    // console.log(JSON.stringify(this.signalData));
     // this.cpyJumbRow.show();
     // cpyJumBtn.popover('show');
   }
 
+  clearRoomThenStartSession = () => {
+    const {roomInput, role} = this.state;
+
+    clearData(roomInput, async () => {
+      writeData(
+        roomInput,
+        role,
+        {offer: JSON.stringify(this.signalData)},
+        () => {
+          this.startCheckingServerData();
+        });
+    })
+  }
+
+  startCheckingServerData = () => {
+    const {roomInput} = this.state;
+
+    this.updateServerTimer = setInterval(async () => {
+      const res = await readData(roomInput);
+      this.setState({dataFromServer: res});
+    }, 1000);
+  }
 
   gotIceCandidate = (event) => {
-    console.log('gotIceCandidate');
+    const {roomInput, role} = this.state;
+    console.log('gotIceCandidate', event);
     if (event.candidate) {
       this.signalData["ice"].push(event.candidate);
-      this.setState({input: JSON.stringify(this.signalData)})
-      // document.getElementById("desc").value = JSON.stringify(signalData);
+      if (this.timeOut !== null) {
+        clearTimeout(this.timeOut)
+      }
+      this.timeOut = setTimeout(() => {
+        if (roomInput.length > 0) {
+          if (role === ROLES.HOST) {
+            this.clearRoomThenStartSession();
+          }
+          this.setState({input: JSON.stringify(this.signalData)})
+        }
+      }, 700);
     }
   }
 
@@ -173,6 +252,8 @@ class App extends Component {
         break;
       case 'connected': // on caller side
         console.log('Connection established.');
+        clearInterval(this.updateServerTimer);
+        this.updateServerTimer = null;
         // $('#textModal').modal('hide');
         // $("#localVideo").show();
         // $("#hangupdiv").show();
@@ -206,43 +287,72 @@ class App extends Component {
   }
 
   handleJoin = () => {
-    this.joinSession();
+    this.startCheckingServerData();
+    // this.joinSession();
+  }
+
+  setRole = (role) => {
+    this.setState({role});
+  }
+
+  renderMain = () => {
+    const {role, roomInput} = this.state;
+    if (role !== '') {
+      return (
+        <>
+          <input
+            placeholder='ROOM ID'
+            value={roomInput}
+            onChange={(e) => this.setState({roomInput: e.target.value})}
+          />
+          {role === ROLES.HOST && (
+            <div>
+              <button onClick={this.handleCall}>
+                call
+              </button>
+              <div>
+                <video
+                  controls
+                  autoPlay
+                  ref={this.localVideo}
+                  width={300}
+                  height={300}
+                />
+              </div>
+            </div>
+          )}
+          {role === ROLES.CLIENT && (
+            <div>
+              <button onClick={this.handleJoin}>
+                join
+              </button>
+              <div>
+                <video
+                  controls
+                  autoPlay
+                  ref={this.remoteVideo}
+                  width={300}
+                  height={300}
+                />
+              </div>
+            </div>
+          )}
+        </>
+      )
+    }
+    return null;
   }
 
   render() {
-    const {input} = this.state;
-
     return (
       <div className="App">
-        <button onClick={this.handleCall}>
-          call
+        <button className="button" onClick={() => this.setRole(ROLES.HOST)}>
+          Host
         </button>
-        <button onClick={this.handleJoin}>
-          join
+        <button className="button" onClick={() => this.setRole(ROLES.CLIENT)}>
+          Client
         </button>
-        <textarea
-          value={input} 
-          placeholder='copy'
-          onChange={(e) => this.setState({input: e.target.value})}
-        />
-        <div>
-          <span>local</span>
-          <video
-            autoPlay
-            ref={this.localVideo}
-            width={100}
-            height={100}
-          />
-        </div>
-        <div>
-          <span>remote</span>
-          <video
-            autoPlay
-            ref={this.remoteVideo}
-            width={100}
-            height={100}
-          />
-        </div>
+        {this.renderMain()}
       </div>
     );
   }
